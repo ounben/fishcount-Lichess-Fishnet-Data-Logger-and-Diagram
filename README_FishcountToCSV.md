@@ -16,13 +16,13 @@ Fishnet is a network analysis and simulation tool. This script reads data from t
 ## Installation
 
 1.  Install Python (see link above). Select the "Add Python to PATH" option during installation.
-2.  Save the script: `FishnetToCSV.py` in a folder of your choice.
+2.  Save the script: `FishcountToCSV.py` in a folder of your choice.
 
 ## Usage
 
 1.  Open PowerShell.
 2.  Navigate to the script: `cd C:\Path\to\Script`.
-3.  Run the script: `python FishnetToCSV.py` or `py FishnetToCSV.py`
+3.  Run the script: `python FishcountToCSV.py` or `py FishcountToCSV.py`
 
 ## Configuration
 
