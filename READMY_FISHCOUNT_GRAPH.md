@@ -53,7 +53,7 @@ Messages in the GUI
 Messages are displayed in the GUI if no data is found for the selected period or an error occurs.
 
 License
-[You can specify the license for your project here, e.g., MIT License]
+[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
 
 Contact
 Feel free to open an issue on GitHub at ounben (https://github.com/ounben) for any questions or feedback.
