@@ -1,5 +1,3 @@
-Markdown
-
 # Fishnet Data Visualization with Tkinter and Matplotlib (Windows Edition)
 
 This Python script creates an interactive graphical user interface (GUI) using Tkinter and Matplotlib to display and analyze data from a CSV file (`FishnetCSV1.csv`) on Windows.
@@ -58,4 +56,5 @@ License
 [You can specify the license for your project here, e.g., MIT License]
 
 Contact
-[You can specify your contact information here]
+Feel free to open an issue on GitHub at ounben (https://github.com/ounben) for any questions or feedback.
+
