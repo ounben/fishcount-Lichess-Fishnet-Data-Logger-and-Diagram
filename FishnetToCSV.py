@@ -40,7 +40,7 @@ def create_csv_if_not_exists(csv_file):
 
 
 if __name__ == "__main__":
-    json_file = r'C:\Users\bou\.fishnet-stats'  # Pfad anpassen!
+    json_file = r'C:\????\???\.fishnet-stats'  # Pfad anpassen!
     csv_file = 'FishnetCSV1.csv'
 
     create_csv_if_not_exists(csv_file)
