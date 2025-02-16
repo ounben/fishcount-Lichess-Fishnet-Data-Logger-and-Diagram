@@ -24,7 +24,7 @@ Lichess Fishnet ( <https://github.com/lichess-org/fishnet)>) is a network analys
 
 1.  Open PowerShell.
 2.  Navigate to the script: `cd C:\Path\to\Script`.
-3.  Run the script: `python FishnetToCSV.py` or `py FishnetToCSV.py`
+3.  Run the script: `python FishcountToCSV.py` or `py FishcountToCSV.py`
    
 https://github.com/ounben/fishcount/blob/main/Sample%20of%20Fishcount%20CMD.png
 
