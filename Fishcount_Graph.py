@@ -33,6 +33,10 @@ def plot_differences(filename, batch_column, node_column): # num_rows entfernt
         df['Zeitstempel'] = pd.to_datetime(df['Zeitstempel'], errors='coerce')
         df = df.dropna(subset=['Zeitstempel'])
 
+        # Nur Daten des letzten Tages filtern
+        # last_day = df['Zeitstempel'].max().date()
+        # df = df[df['Zeitstempel'].dt.date == last_day]
+
         df['Diff_' + batch_column] = df[batch_column].diff()
         df['Diff_' + node_column] = df[node_column].diff() / 1000000000
 
@@ -54,7 +58,10 @@ def plot_differences(filename, batch_column, node_column): # num_rows entfernt
         ax2.axhline(y=df['Diff_' + node_column].mean(), color='green', linestyle='--', label='Mittelwert Node-Differenz')
 
         last_batch = df[batch_column].iloc[-1]
+        #last_batch_diff = df_filtered['batch_column'].iloc[-1]
+
         current_time = datetime.now().strftime("%H:%M:%S")
+
         ax1.set_title(f'{batch_column}- und {node_column} pro Stunde (Letzter {batch_column}: {last_batch}) {current_time}')
         #ax1.set_title(f'Batch (Total: {last_batch}, /nAnzahl Batches: {anzahl_batches}, /nMin: {min_batch_diff:.2f}, /nMax: {max_batch_diff:.2f}) /n{current_time}')
 
@@ -69,16 +76,22 @@ def plot_differences(filename, batch_column, node_column): # num_rows entfernt
         fig.canvas.flush_events()
         #plt.show()
 
-        return fig, ax1, ax2, line1, line2, df  # ax2 wurde hinzugefügt df wird zurückgegeben
+        # direkt update_plot aufrufen, nachdem der Plot erstellt wurde
+        if 'cal_von' in globals() and 'cal_bis' in globals(): # überprüfen ob cal_von und cal_bis definiert ist.
+            update_plot(batch_column, node_column, cal_von, cal_bis) # Übergabe der Kalenderobjekte
+        else:
+            print("cal_von oder cal_bis nicht definiert.")
+
+        return fig, ax1, ax2, line1, line2, df
 
     except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError) as e:
         print(f"Error: {e}")
-        return None, None, None, None, None # df wird auch im Fehlerfall zurückgegeben
+        return None, None, None, None, None, None # df wird auch im Fehlerfall zurückgegeben
     except Exception as e:
         print(f"Unexpected error: {e}")
-        return None, None, None, None, None # df wird auch im Fehlerfall zurückgegeben
+        return None, None, None, None, None, None # df wird auch im Fehlerfall zurückgegeben
 
-def update_plot(batch_column, node_column):
+def update_plot(batch_column, node_column, cal_von, cal_bis):
     global fig, canvas, df, ax1, ax2, line1, line2
     try:
         start_date_str = cal_von.get_date()
@@ -152,7 +165,9 @@ def update_plot(batch_column, node_column):
             max_batch_diff_timestamps = df_filtered.loc[df_filtered['Diff_' + batch_column] == max_batch_diff, 'Zeitstempel'].tolist()
 
             last_batch = df_filtered['Batch'].iloc[-1]
-            
+
+            last_batch_diff = df_filtered['Diff_Batch'].iloc[-1]
+
             current_time = datetime.now().strftime("%H:%M:%S")
             #anzahl_batches = df_filtered['Batch'].nunique()  # .nunique() zählt eindeutige Werte
             anzahl_batches = len(df_filtered['Batch'])  # Menge der Batches berechnen
@@ -166,7 +181,7 @@ def update_plot(batch_column, node_column):
 
             # ERSETZE den gesamten Titelstring jedes Mal neu:
             ax1.set_title('')  # Alten Titel explizit löschen
-            ax1.set_title(f'Batch Total: {last_batch}, \nGesamtmenge: {gesamt_summe}, \nDurchschnitt: {mean_batch_diff}, \nMin: {min_batch_diff:.2f}@{min_timestamp}, \nMax: {max_batch_diff:.2f}@{max_timestamp} \n{current_time}')
+            ax1.set_title(f'Batch Total: {last_batch}, \nGesamtmenge: {gesamt_summe}, \nDurchschnitt: {mean_batch_diff}, \nMin: {min_batch_diff:.2f}@{min_timestamp}, \nMax: {max_batch_diff:.2f}@{max_timestamp} \n{current_time} {last_batch_diff}')
 
 
 
@@ -222,9 +237,11 @@ if fig is not None and ax1 is not None and df is not None:  # Wichtige Änderung
     cal_bis.pack(side=tk.LEFT, padx=10, pady=10)
 
     #update_button = tk.Button(date_frame, text="Diagramm aktualisieren", font=("Arial", 14), command=update_plot)
-    update_button = tk.Button(date_frame, text="Diagramm aktualisieren", font=("Arial", 14), command=lambda: update_plot(batch_col, node_col)) # Lambda Funktion verwenden!
+    update_button = tk.Button(date_frame, text="Diagramm aktualisieren", font=("Arial", 14), command=lambda: update_plot(batch_col, node_col, cal_von, cal_bis)) # Lambda Funktion verwenden!
 
     update_button.pack(side=tk.LEFT, padx=10, pady=10)
+    update_plot(batch_col, node_col, cal_von, cal_bis) # Plot sofort aktualisieren.
+    update_button.invoke() # simuliert einen Button druck
 
     plt.rcParams.update({'font.size': 12})
 
