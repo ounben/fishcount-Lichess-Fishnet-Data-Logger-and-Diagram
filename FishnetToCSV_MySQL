@@ -1,0 +1,123 @@
+import json
+import csv
+import time
+import os
+import datetime
+import mysql.connector
+
+JSON_FILE_NAME = '.fishnet-stats'
+CSV_FILE_NAME = 'FishnetCSV1.csv'
+JSON_KEYS = ['total_batches', 'total_positions', 'total_nodes']
+
+# MySQL-Verbindungsinformationen (optional)
+MYSQL_HOST = 'localhost'
+MYSQL_USER = 'IhrBenutzername'
+MYSQL_PASSWORD = 'IhrPasswort'
+MYSQL_DATABASE = ''  # Datenbankname leer lassen, um MySQL zu deaktivieren
+MYSQL_TABLE = 'fishnet_data'
+
+def create_mysql_table_if_not_exists(cursor):
+    """Erstellt die MySQL-Tabelle, falls sie nicht existiert."""
+    try:
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS {MYSQL_TABLE} (
+                Zeitstempel DATETIME PRIMARY KEY,
+                Batches INT,
+                Positionen BIGINT,
+                Nodes BIGINT
+            )
+        """)
+        print(f"MySQL-Tabelle '{MYSQL_TABLE}' wurde erstellt oder existiert bereits.")
+    except mysql.connector.Error as e:
+        print(f"Fehler beim Erstellen der MySQL-Tabelle: {e}")
+
+def read_and_write_data(json_file, csv_file, cursor, cnx):
+    """Liest Daten aus einer JSON-Datei und schreibt sie in eine CSV-Datei und optional in MySQL."""
+    try:
+        full_json_path = os.path.join(os.getcwd(), json_file)
+
+        with open(full_json_path, 'r') as f:
+            data = json.load(f)
+
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        if all(key in data for key in JSON_KEYS):
+            # CSV-Datei schreiben
+            with open(csv_file, 'a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow([timestamp, data['total_batches'], data['total_positions'], data['total_nodes']])
+
+            # MySQL-Daten einfügen (falls Datenbank angegeben)
+            if MYSQL_DATABASE:
+                try:
+                    cursor.execute(f"""
+                        INSERT INTO {MYSQL_TABLE} (Zeitstempel, Batches, Positionen, Nodes)
+                        VALUES (%s, %s, %s, %s)
+                    """, (timestamp, data['total_batches'], data['total_positions'], data['total_nodes']))
+                    cnx.commit()
+                    print(f"Daten in MySQL geschrieben: {timestamp}, {data['total_batches']}, {data['total_positions']}, {data['total_nodes']}")
+                except mysql.connector.Error as e:
+                    print(f"Fehler beim Einfügen von Daten in MySQL: {e}")
+                    cnx.rollback()
+
+            print(f"Daten geschrieben: {timestamp}, {data['total_batches']}, {data['total_positions']}, {data['total_nodes']}")
+        else:
+            print("JSON-Datei enthält nicht alle erforderlichen Schlüssel.")
+
+    except FileNotFoundError:
+        print(f"Datei '{json_file}' nicht gefunden.")
+    except json.JSONDecodeError:
+        print("Fehler beim Parsen der JSON-Datei.")
+    except Exception as e:
+        print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
+
+def create_csv_if_not_exists(csv_file):
+    """Erstellt die CSV-Datei, falls sie nicht existiert, und schreibt eine Header-Zeile."""
+    if not os.path.exists(csv_file):
+        try:
+            with open(csv_file, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Zeitstempel', 'Batches', 'Positionen', 'Nodes'])
+            print(f"CSV-Datei '{csv_file}' wurde erstellt.")
+        except Exception as e:
+            print(f"Fehler beim Erstellen der CSV-Datei: {e}")
+
+if __name__ == "__main__":
+    json_file = JSON_FILE_NAME
+    csv_file = CSV_FILE_NAME
+
+    create_csv_if_not_exists(csv_file)
+
+    if MYSQL_DATABASE:  # MySQL nur verwenden, wenn Datenbank angegeben
+        try:
+            cnx = mysql.connector.connect(user=MYSQL_USER, password=MYSQL_PASSWORD, host=MYSQL_HOST, database=MYSQL_DATABASE)
+            cursor = cnx.cursor()
+            create_mysql_table_if_not_exists(cursor)
+        except mysql.connector.Error as e:
+            print(f"Fehler bei der MySQL-Verbindung: {e}")
+            cnx = None  # cnx auf None setzen, um MySQL-Verwendung zu verhindern
+    else:
+        cnx = None  # cnx auf None setzen, wenn keine Datenbank angegeben
+
+    while True:
+        now = datetime.datetime.now()
+        next_hour = now + datetime.timedelta(hours=1)
+        next_hour = next_hour.replace(minute=0, second=0, microsecond=0)
+        wait_seconds = (next_hour - now).total_seconds()
+
+        next_execution_time = next_hour
+
+        print(f"Nächste Ausführung: {next_execution_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        time.sleep(wait_seconds)
+
+        if cnx:  # MySQL nur verwenden, wenn cnx nicht None ist
+            read_and_write_data(json_file, csv_file, cursor, cnx)
+        else:
+            read_and_write_data(json_file, csv_file, None, None)  # cursor und cnx als None übergeben
+
+        time.sleep(1)
+
+    if 'cnx' in locals() and cnx and cnx.is_connected():
+        cursor.close()
+        cnx.close()
