@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import tkinter as tk
 from tkcalendar import Calendar  # Für die Datumsauswahl
+from datetime import datetime, timedelta
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.dates as mdates
 
@@ -18,6 +19,8 @@ line2 = None
 canvas = None
 df = None
 filename = 'FishnetCSV1.csv'  # Dateiname global definieren
+click_count = 0
+#plt.axvline(x=some_x_value, color='gray', linestyle='--', linewidth=0.5)
 
 def plot_differences(filename, batch_column, node_column): # num_rows entfernt
     global df # df als global deklarieren, da wir es in update_plot brauchen
@@ -45,7 +48,7 @@ def plot_differences(filename, batch_column, node_column): # num_rows entfernt
 
         zero_timestamps = df['Zeitstempel'][df['Zeitstempel'].dt.hour == 0]
         for timestamp in zero_timestamps:
-            ax1.axvline(x=timestamp, color='black', linewidth=3, linestyle='--')
+            ax1.axvline(x=timestamp, color='gray', linestyle='--', linewidth=0.5)
 
         ax1.set_xlabel('Zeitstempel', fontsize=14)
         ax1.set_ylabel(f'Differenz {batch_column}', fontsize=14)
@@ -212,7 +215,77 @@ def update_plot(batch_column, node_column, cal_von, cal_bis):
         print(f"Unerwarteter Fehler: {e}")
         import tkinter.messagebox as messagebox
         messagebox.showerror("Fehler", f"Ein Fehler ist aufgetreten: {e}")
-        
+
+
+def update_plot_tag(batch_column, node_column, cal_von, cal_bis):
+    global fig, canvas, df, ax1, ax2, line1, line2, click_count
+    try:
+        click_count += 1
+        if click_count == 1:
+            # Letzte 30 Tage anzeigen
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=30)
+        else:
+            # Daten vom Kalender anzeigen
+            start_date = datetime.strptime(cal_von.get_date(), '%Y-%m-%d').date()
+            end_date = datetime.strptime(cal_bis.get_date(), '%Y-%m-%d').date()
+
+        df['Zeitstempel_Datum'] = df['Zeitstempel'].dt.date
+        df_filtered = df[(df['Zeitstempel_Datum'] >= start_date) & (df['Zeitstempel_Datum'] <= end_date)]
+
+        if df_filtered is not None:
+            df_daily = df_filtered.groupby(df_filtered['Zeitstempel'].dt.date).agg({
+                'Diff_Batch': 'sum',
+                'Diff_Nodes': 'sum',
+                'Batch': 'last'
+            }).reset_index()
+
+            if not df_daily.empty and line1 and line2 and ax1 and ax2:
+                line1.set_data(df_daily['Zeitstempel'], df_daily['Diff_Batch'])
+                line2.set_data(df_daily['Zeitstempel'], df_daily['Diff_Nodes'])
+                ax1.set_xlim(df_daily['Zeitstempel'].min(), df_daily['Zeitstempel'].max())
+                ax2.set_xlim(df_daily['Zeitstempel'].min(), df_daily['Zeitstempel'].max())
+                ax1.relim(); ax1.autoscale_view()
+                ax2.relim(); ax2.autoscale_view()
+
+                # Formatierung der X-Achse
+                ax1.xaxis.set_major_formatter(mdates.ConciseDateFormatter(mdates.AutoDateLocator()))
+
+                gesamt_summe = df_daily['Diff_Batch'].sum()
+                mean_batch_diff = df_daily['Diff_Batch'].mean()
+
+                # Aktuellen Tag ausschließen
+                today = datetime.now().date()
+                df_filtered_min = df_daily[df_daily['Zeitstempel'] != today]
+
+                if not df_filtered_min.empty:
+                    min_batch_diff = df_filtered_min['Diff_Batch'].min()
+                    min_timestamp = df_filtered_min.loc[df_filtered_min['Diff_' + batch_column] == min_batch_diff, 'Zeitstempel'].iloc[0].strftime("%d.%m.%Y")
+                else:
+                    min_batch_diff = float('nan') # oder einen anderen Standardwert
+                    min_timestamp = "N/A"
+
+                max_batch_diff = df_daily['Diff_Batch'].max()
+                max_timestamp = df_daily.loc[df_daily['Diff_' + batch_column] == max_batch_diff, 'Zeitstempel'].iloc[0].strftime("%d.%m.%Y")
+                last_batch = df_daily['Batch'].iloc[-1]
+                last_batch_diff = df_daily['Diff_Batch'].iloc[-1]
+                current_time = datetime.now().strftime("%H:%M:%S")
+
+                ax1.set_title(f'Tägliche Batch Total: {last_batch}, \nGesamtmenge: {gesamt_summe}, \nDurchschnitt: {mean_batch_diff:.2f}, \nMin: {min_batch_diff:.2f}@{min_timestamp}, \nMax: {max_batch_diff:.2f}@{max_timestamp} \n{current_time} {last_batch_diff}')
+
+                # Beispiel für eine dünne gestrichelte vertikale Linie
+                ax1.axvline(x=datetime.now().date(), color='gray', linestyle='--', linewidth=0.5)
+
+                fig.tight_layout(); canvas.draw(); canvas.flush_events()
+            else:
+                if line1 and line2 and ax1 and ax2:
+                    line1.set_data([], []); line2.set_data([], [])
+                    ax1.relim(); ax1.autoscale_view(); ax2.relim(); ax2.autoscale_view()
+                    canvas.draw(); canvas.flush_events()
+                messagebox.showinfo("Info", "Keine Daten für den ausgewählten Zeitraum gefunden.")
+    except Exception as e:
+        messagebox.showerror("Fehler", f"Ein Fehler ist aufgetreten: {e}")
+
 root = tk.Tk()
 root.geometry("1200x900")
 root.title("Diagramm mit Datumsauswahl")
@@ -242,6 +315,9 @@ if fig is not None and ax1 is not None and df is not None:  # Wichtige Änderung
     update_button.pack(side=tk.LEFT, padx=10, pady=10)
     update_plot(batch_col, node_col, cal_von, cal_bis) # Plot sofort aktualisieren.
     update_button.invoke() # simuliert einen Button druck
+
+    update_button_tag = tk.Button(date_frame, text="Diagramm pro Tag", font=("Arial", 14), command=lambda: update_plot_tag(batch_col, node_col, cal_von, cal_bis))
+    update_button_tag.pack(side=tk.LEFT, padx=10, pady=10)
 
     plt.rcParams.update({'font.size': 12})
 
